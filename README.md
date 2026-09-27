@@ -8,8 +8,9 @@
 
 ## ✨ 项目特点
 
-- **真实数据**：通过腾讯财经公开接口拉取**前复权**日 K 线，无需注册、无 API Key
-- **可复用脚本**：`fetch_kline.py` 和 `generate_report.py` 都是参数化的，加一只股票只需 1 行命令
+- **真实数据**：通过 akshare（首选）或腾讯财经公开接口拉取**前复权**日 K 线，无需注册、无 API Key
+- **可复用脚本**：`fetch_kline_ak.py`、`fetch_kline.py` 和 `generate_report.py` 都是参数化的，加一只股票只需 1 行命令
+- **数据 + 基本面**：除日 K 线外，还附带总市值 / 流通市值 / 行业分类 / 80 项财务摘要（105 期）
 - **中文 PDF 报告**：嵌入 Arial Unicode 字体，跨平台打开**零乱码**
 - **数据 + 代码 + 报告 + 可视化过程图** 全部留存，方便回溯与同行评审
 
@@ -20,10 +21,13 @@
 ```
 stock-analysis/
 ├── README.md                  ← 本文件
-├── fetch_kline.py             ← 通用拉数脚本(腾讯接口)
+├── fetch_kline_ak.py          ← ⭐ 通用拉数脚本(akshare,推荐；含日K + 基本面 + 财务摘要)
+├── fetch_kline.py             ← 旧版拉数脚本(腾讯接口,保留展示迭代过程)
 ├── generate_report.py         ← 通用报告生成脚本(参数化,内置基本面语境内置字典)
 ├── 海螺水泥/                  ← 第 1 个案例
-│   ├── 海螺水泥_600585_日K.csv
+│   ├── 海螺水泥_600585_日K.csv          ← akshare 版(11 列)
+│   ├── 海螺水泥_600585_基本信息.csv      ← 市值 / 行业
+│   ├── 海螺水泥_600585_财务摘要.csv      ← 80 指标 × 102 期
 │   ├── 海螺水泥股价分析.ipynb        ← 折线 + 均线初探
 │   ├── 02_海螺水泥K线与技术分析.ipynb  ← K 线 + 成交量 + 金叉死叉
 │   ├── 海螺水泥股价分析报告.pdf         ← 文字版 PDF(reportlab)
@@ -31,7 +35,9 @@ stock-analysis/
 │   ├── 报告_第1页.png ~ 第3页.png      ← PDF 渲染过程图
 │   └── 生成股价分析报告.py              ← 旧版单股脚本(保留展示迭代过程)
 └── 长江电力/                  ← 第 2 个案例
-    ├── 长江电力_600900_日K.csv
+    ├── 长江电力_600900_日K.csv          ← akshare 版(11 列)
+    ├── 长江电力_600900_基本信息.csv
+    ├── 长江电力_600900_财务摘要.csv
     ├── 长江电力股价分析报告.pdf
     ├── 长江电力股价分析报告_图片版.pdf
     └── 报告_第1页.png ~ 第3页.png
@@ -41,16 +47,36 @@ stock-analysis/
 
 ## 🚀 快速上手
 
-### 1. 拉取数据
+### 1. 拉取数据（推荐：akshare 版）
 
 ```bash
-python fetch_kline.py 600900 长江电力        # 默认 600 个交易日(约 2.5 年)
-python fetch_kline.py 600585 海螺水泥 490   # 自定义天数
+python fetch_kline_ak.py 600585 海螺水泥        # 默认 490 个交易日(约 2 年)
+python fetch_kline_ak.py 600900 长江电力 750    # 自定义天数
 ```
 
-输出 `<名称>_<代码>_日K.csv`，列：`date, open, close, high, low, volume, pct_change`。
+输出三个 CSV：
 
-> ⚠️ 如果本机有 `HTTP_PROXY` 环境变量注入，脚本会自动 `os.environ.pop` 移除后直连腾讯接口。
+| 文件 | 内容 |
+|---|---|
+| `<名称>_<代码>_日K.csv` | 11 列：`date, open, close, high, low, volume, pct_change, amount, amplitude, change, turnover` |
+| `<名称>_<代码>_基本信息.csv` | 最新价、总股本、流通股、总市值、流通市值、行业 |
+| `<名称>_<代码>_财务摘要.csv` | 80 个财务指标 × 100+ 个报告期 |
+
+> 💡 前 7 列与旧版脚本输出**完全一致**，因此 `generate_report.py` 可以无改动直接读取。
+> 本仓库中的 `日K.csv` 已于 2026-09-22 用 akshare 重新拉取（数据延长至 2026-09-22）。
+
+<details>
+<summary>旧版拉数方式（腾讯接口，保留备查）</summary>
+
+```bash
+python fetch_kline.py 600900 长江电力 490
+```
+
+输出 `date, open, close, high, low, volume, pct_change` 共 7 列。
+
+</details>
+
+> ⚠️ 如果本机有 `HTTP_PROXY` 环境变量注入，脚本会自动 `os.environ.pop` 移除后直连。
 
 ### 2. 生成报告
 
@@ -93,7 +119,8 @@ FUNDAMENTAL["601318"] = "中国平安是国内综合性金融龙头,业务涵盖
 | reportlab | PDF 排版（嵌入 Arial Unicode.ttf 防乱码） |
 | pypdfium2 | PDF 渲染自查 |
 | Pillow | 合成图片版 PDF（终极防乱码方案） |
-| 腾讯财经公开接口 | 日 K 线数据源 |
+| akshare | 数据源（日 K 线、市值、行业、财务摘要） |
+| 腾讯财经公开接口 | 备用数据源（旧版脚本） |
 
 ---
 
